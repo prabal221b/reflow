@@ -40,6 +40,10 @@
   :root {
     --background: var(--color-stone-50);
     --foreground: var(--color-stone-800);
+    --card: var(--color-stone-50);
+    --card-foreground: var(--color-stone-800);
+    --popover: var(--color-stone-50);
+    --popover-foreground: var(--color-stone-800);
     --primary: var(--color-primary);
     --border: var(--color-stone-200);
     --muted-foreground: var(--color-stone-500);
@@ -48,6 +52,10 @@
   .dark {
     --background: var(--color-stone-950);
     --foreground: var(--color-stone-200);
+    --card: oklch(0.14 0.004 80);
+    --card-foreground: var(--color-stone-200);
+    --popover: oklch(0.14 0.004 80);
+    --popover-foreground: var(--color-stone-200);
     --primary: oklch(0.50 0.14 260);
     --border: var(--color-stone-800);
     --muted-foreground: var(--color-stone-400);
