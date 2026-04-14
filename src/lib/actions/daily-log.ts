@@ -2,7 +2,7 @@
 
 import { connectDB } from "../db/connection";
 import DailyLog from "../db/models/daily-log";
-import User from "../db/models/user";
+import { getUser } from "../data/user";
 import { requireUserId } from "../auth/session";
 import { dailyCheckinSchema, workStartSchema } from "../validators/daily-log";
 import { getTodayString } from "../utils/date";
@@ -20,7 +20,7 @@ export async function saveDailyCheckin(
     }
 
     await connectDB();
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
     const dateStr = getTodayString(user?.settings?.timezone);
 
     await DailyLog.findOneAndUpdate(
@@ -54,7 +54,7 @@ export async function saveWorkStart(
     }
 
     await connectDB();
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
     const dateStr = getTodayString(user?.settings?.timezone);
 
     await DailyLog.findOneAndUpdate(
@@ -82,11 +82,13 @@ export async function saveWorkStart(
 
 export async function getTodayLog(userId: string) {
   await connectDB();
-  const user = await User.findById(userId);
+  const user = await getUser(userId);
   const dateStr = getTodayString(user?.settings?.timezone);
 
   return DailyLog.findOne({
     userId: new mongoose.Types.ObjectId(userId),
     date: dateStr,
-  }).lean();
+  })
+    .select("-__v -userId") // Sanitize internal metadata
+    .lean();
 }

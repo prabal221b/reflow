@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/config";
-import { connectDB } from "@/lib/db/connection";
 import { getUser } from "@/lib/data/user";
 import { Sidebar, BottomNav } from "@/components/layout/navigation";
 import { UrgeFab } from "@/components/layout/urge-fab";

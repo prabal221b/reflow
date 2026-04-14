@@ -4,6 +4,7 @@ import { connectDB } from "../db/connection";
 import Urge from "../db/models/urge";
 import DailyLog from "../db/models/daily-log";
 import User from "../db/models/user";
+import { getUser } from "../data/user";
 import { requireUserId } from "../auth/session";
 import { logUrgeSchema, logRelapseSchema } from "../validators/urge";
 import { getTodayString } from "../utils/date";
@@ -22,7 +23,7 @@ export async function logUrge(
     }
 
     await connectDB();
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
     const dateStr = getTodayString(user?.settings?.timezone);
 
     const urge = await Urge.create({
@@ -59,7 +60,7 @@ export async function logRelapse(
     }
 
     await connectDB();
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
     const dateStr = getTodayString(user?.settings?.timezone);
 
     await Urge.create({

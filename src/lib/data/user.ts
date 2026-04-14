@@ -9,6 +9,6 @@ import User from "../db/models/user";
  */
 export const getUser = cache(async (userId: string) => {
   await connectDB();
-  const user = await User.findById(userId).lean();
+  const user = await User.findById(userId).select("-passwordHash -providerId -deletionRequestedAt").lean();
   return user;
 });

@@ -34,6 +34,6 @@ jobs:
         run: npm run build
         env:
           # Mock environment variables required for Next.js build
-          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          NEXT_PUBLIC_APP_URL: "https://reflow-six.vercel.app/"
           MONGODB_URI: "mongodb://localhost:27017/reflow-test"
           AUTH_SECRET: "mock-secret-for-ci-build"

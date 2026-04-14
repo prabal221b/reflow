@@ -2,6 +2,7 @@
 
 import { connectDB } from "../db/connection";
 import User from "../db/models/user";
+import { getUser } from "../data/user";
 import { requireUserId } from "../auth/session";
 import type { ActionResult, OnboardingResponses } from "../types";
 import { generateInitialPlan } from "../utils/plan-generator";
@@ -71,8 +72,7 @@ export async function completeOnboarding(): Promise<
   try {
     const userId = await requireUserId();
     await connectDB();
-
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
     if (!user) {
       return { success: false, error: "User not found", code: "NOT_FOUND" };
     }

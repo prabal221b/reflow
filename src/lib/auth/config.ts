@@ -39,7 +39,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           return {
             id: user._id.toString(),
-            email: user.email,
             name: user.name,
           };
         } catch {
@@ -102,7 +101,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (token.userId) {
+        // Strip image and email from public session if they aren't strictly needed for the UI profile.
+        // We'll keep 'name' as it's used for the "Welcome Tanay" UI.
         session.user.id = token.userId as string;
+        const user = session.user as { name?: string; email?: string; image?: string; id?: string };
+        delete user.email;
+        delete user.image;
       }
       return session;
     },

@@ -4,6 +4,7 @@ import { connectDB } from "../db/connection";
 import FocusSession from "../db/models/focus-session";
 import DailyLog from "../db/models/daily-log";
 import User from "../db/models/user";
+import { getUser } from "../data/user";
 import { requireUserId } from "../auth/session";
 import { startFocusSchema, completeFocusSchema, sessionIdSchema } from "../validators/focus";
 import { getTodayString } from "../utils/date";
@@ -37,7 +38,7 @@ export async function startFocusSession(
     const durationSeconds = duration * 60;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + (durationSeconds + SESSION_GRACE_PERIOD) * 1000);
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
     const dateStr = getTodayString(user?.settings?.timezone);
 
     const session = await FocusSession.create({
@@ -187,7 +188,7 @@ export async function completeFocusSession(
 
     // Consolidate non-dependent writes into a single parallel operation
     const [user] = await Promise.all([
-      User.findById(userId),
+      getUser(userId),
       FocusSession.findByIdAndUpdate(session._id, {
         status: "completed",
         completedAt: now,
@@ -287,7 +288,9 @@ export async function getActiveSession() {
   const session = await FocusSession.findOne({
     userId: new mongoose.Types.ObjectId(userId),
     status: { $in: ["active", "paused"] },
-  }).lean();
+  })
+    .select("-__v -userId") // Sanitize internal metadata
+    .lean();
 
   return session;
 }

@@ -4,6 +4,7 @@ import { connectDB } from "../db/connection";
 import SocialSession from "../db/models/social-session";
 import DailyLog from "../db/models/daily-log";
 import User from "../db/models/user";
+import { getUser } from "../data/user";
 import { requireUserId } from "../auth/session";
 import { scheduleSocialSchema, logCheckSchema } from "../validators/social";
 import { getTodayString } from "../utils/date";
@@ -106,7 +107,7 @@ export async function completeSocialWindow(
       return { success: false, error: "Window not found", code: "NOT_FOUND" };
     }
 
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
     const dateStr = getTodayString(user?.settings?.timezone);
 
     await DailyLog.findOneAndUpdate(
@@ -161,13 +162,14 @@ export async function logUnplannedCheck(
 
 export async function getTodaySocialSessions(userId: string) {
   await connectDB();
-  const user = await User.findById(userId);
+  const user = await getUser(userId);
   const dateStr = getTodayString(user?.settings?.timezone);
 
   return SocialSession.find({
     userId: new mongoose.Types.ObjectId(userId),
     date: dateStr,
   })
+    .select("-__v -userId") // Sanitize internal metadata
     .sort({ createdAt: -1 })
     .lean();
 }
