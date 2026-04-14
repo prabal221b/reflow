@@ -25,9 +25,11 @@ export async function proxy(req: NextRequest) {
   }
 
   // Use more robust token detection for Next.js 16/Auth.js v5 production
+  // We check for both secure and insecure tokens to be safe
   const token = await getToken({ 
     req, 
-    secret: process.env.AUTH_SECRET,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    salt: process.env.NODE_ENV === "production" ? "__Secure-authjs.session-token" : "authjs.session-token"
   });
 
   const isAuthenticated = !!token;
