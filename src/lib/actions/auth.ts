@@ -20,11 +20,14 @@ export async function registerUser(
     }
 
     const { name, email, password } = parsed.data;
+    console.log(`Register: Attempting registration for ${email}`);
     await connectDB();
+    console.log("Register: DB Connected.");
 
-    // Check for existing user
-    const existing = await User.findOne({ email: email.toLowerCase().trim() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
+      console.log(`Register: Conflict - User ${normalizedEmail} already exists`);
       return {
         success: false,
         error: "An account with this email already exists",
@@ -36,14 +39,15 @@ export async function registerUser(
 
     const user = await User.create({
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       passwordHash,
       provider: "credentials",
     });
 
+    console.log(`Register: Successfully created user ${normalizedEmail}`);
     return { success: true, data: { id: user._id.toString() } };
   } catch (error) {
-    console.error("Register error:", error);
+    console.error("Register Error Details:", error instanceof Error ? error.message : error);
     return {
       success: false,
       error: "Something went wrong. Please try again.",
