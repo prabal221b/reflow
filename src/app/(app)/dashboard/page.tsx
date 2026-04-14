@@ -1,6 +1,6 @@
 import { requireUserId } from "@/lib/auth/session";
 import { connectDB } from "@/lib/db/connection";
-import User from "@/lib/db/models/user";
+import { getUser } from "@/lib/data/user";
 import DailyLog from "@/lib/db/models/daily-log";
 import FocusSession from "@/lib/db/models/focus-session";
 import { getTodayString, daysSince } from "@/lib/utils/date";
@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   await connectDB();
 
   const oid = new mongoose.Types.ObjectId(userId);
-  const user = await User.findById(userId).lean();
+  const user = await getUser(userId);
   if (!user) return null;
 
   const dateStr = getTodayString(user.settings?.timezone);

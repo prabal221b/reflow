@@ -1,6 +1,6 @@
 import { requireUserId } from "@/lib/auth/session";
 import { connectDB } from "@/lib/db/connection";
-import User from "@/lib/db/models/user";
+import { getUser } from "@/lib/data/user";
 import { SettingsClient } from "./settings-client";
 
 export const metadata = { title: "Settings" };
@@ -9,7 +9,7 @@ export default async function SettingsPage() {
   const userId = await requireUserId();
   await connectDB();
 
-  const user = await User.findById(userId).lean();
+  const user = await getUser(userId);
   if (!user) return null;
 
   const settings = {

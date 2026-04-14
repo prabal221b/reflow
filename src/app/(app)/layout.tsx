@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/config";
 import { connectDB } from "@/lib/db/connection";
-import User from "@/lib/db/models/user";
+import { getUser } from "@/lib/data/user";
 import { Sidebar, BottomNav } from "@/components/layout/navigation";
 import { UrgeFab } from "@/components/layout/urge-fab";
 import { AppProviders } from "@/components/providers/app-providers";
@@ -16,8 +16,7 @@ export default async function AppLayout({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  await connectDB();
-  const user = await User.findById(session.user.id).lean();
+  const user = await getUser(session.user.id);
 
   if (user && !user.onboarding?.completed) {
     redirect("/onboarding");

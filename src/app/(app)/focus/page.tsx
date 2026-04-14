@@ -1,6 +1,6 @@
 import { requireUserId } from "@/lib/auth/session";
 import { connectDB } from "@/lib/db/connection";
-import User from "@/lib/db/models/user";
+import { getUser } from "@/lib/data/user";
 import { getActiveSession } from "@/lib/actions/focus";
 import { FocusClient } from "./focus-client";
 
@@ -10,7 +10,7 @@ export default async function FocusPage() {
   const userId = await requireUserId();
   await connectDB();
 
-  const user = await User.findById(userId).lean();
+  const user = await getUser(userId);
   const activeSession = await getActiveSession();
 
   const focusInterval = user?.currentFocusInterval || user?.settings?.focusInterval || 8;
