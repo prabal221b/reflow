@@ -27,9 +27,14 @@ export async function connectDB(): Promise<typeof mongoose> {
     return cached.conn;
   }
 
-  if (!MONGODB_URI) {
-    throw new Error("Please define the MONGODB_URI environment variable in .env.local");
+  let uri = process.env.MONGODB_URI;
+  
+  if (!uri) {
+    throw new Error("Please define the MONGODB_URI environment variable");
   }
+
+  // Clean the URI - remove accidental quotes or whitespace from environment variables
+  uri = uri.trim().replace(/^["'](.+)["']$/, '$1');
 
   if (!cached.promise) {
     const opts = {
@@ -37,7 +42,9 @@ export async function connectDB(): Promise<typeof mongoose> {
       maxPoolSize: 10,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((m) => {
+    console.log("DB: Initiating connection...");
+    cached.promise = mongoose.connect(uri, opts).then((m) => {
+      console.log("DB: Connection established successfully.");
       return m;
     });
   }

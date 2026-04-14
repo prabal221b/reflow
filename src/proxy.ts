@@ -24,12 +24,22 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
-  const isAuthenticated = !!token;
+  // Use more robust token detection for Next.js 16/Auth.js v5 production
+  const token = await getToken({ 
+    req, 
+    secret: process.env.AUTH_SECRET,
+  });
 
-  // API auth endpoints are always public
+  const isAuthenticated = !!token;
+  
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
+  }
+
+  console.log(`MW: ${pathname} | Auth: ${isAuthenticated}`);
+  
+  if (!isAuthenticated && !process.env.AUTH_SECRET) {
+    console.error("MW Error: AUTH_SECRET is not available in Edge environment!");
   }
 
   // Redirect authenticated users away from auth pages

@@ -23,15 +23,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           await connectDB();
     
           const email = (credentials.email as string).toLowerCase().trim();
+          console.log(`Auth Triggered: Attempting to authorize ${email}`);
           const user = await User.findOne({ email });
     
           if (!user) {
-            console.log(`Auth: User not found - ${email}`);
+            console.log(`Auth Failed: User not found - ${email}`);
             return null;
           }
     
           if (!user.passwordHash) {
-            console.log(`Auth: User ${email} has no password hash (likely social login)`);
+            console.log(`Auth Failed: User ${email} has no password hash (social login account)`);
             return null;
           }
     
@@ -41,18 +42,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           );
     
           if (!isValid) {
-            console.log(`Auth: Invalid password for ${email}`);
+            console.log(`Auth Failed: Invalid password for ${email}`);
             return null;
           }
     
-          console.log(`Auth: Successful login for ${email}`);
+          console.log(`Auth Success: User ${email} authorized. Returning session data.`);
           return {
             id: user._id.toString(),
             email: user.email,
             name: user.name,
           };
         } catch (error) {
-          console.error("Auth: Authorize error (check database connection)");
+          console.error("Auth Authorize System Error:", error instanceof Error ? error.message : "Internal Error");
           return null;
         }
       },
