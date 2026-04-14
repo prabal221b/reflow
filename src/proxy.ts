@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "./lib/auth/config";
 
 const publicRoutes = ["/", "/login", "/register", "/forgot-password", "/api/auth"];
 const authRoutes = ["/login", "/register"];
 
-export async function proxy(req: NextRequest) {
+export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   
   // Redirect legacy auth paths to new locations
@@ -24,15 +23,8 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Use more robust token detection for Next.js 16/Auth.js v5 production
-  // We check for both secure and insecure tokens to be safe
-  const token = await getToken({ 
-    req, 
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-    salt: process.env.NODE_ENV === "production" ? "__Secure-authjs.session-token" : "authjs.session-token"
-  });
-
-  const isAuthenticated = !!token;
+  // req.auth is populated by the auth() wrapper
+  const isAuthenticated = !!req.auth;
   
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
@@ -40,10 +32,6 @@ export async function proxy(req: NextRequest) {
 
   console.log(`MW: ${pathname} | Auth: ${isAuthenticated}`);
   
-  if (!isAuthenticated && !process.env.AUTH_SECRET) {
-    console.error("MW Error: AUTH_SECRET is not available in Edge environment!");
-  }
-
   // Redirect authenticated users away from auth pages
   if (isAuthenticated && authRoutes.includes(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
@@ -57,7 +45,9 @@ export async function proxy(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
+
+export default proxy;
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
