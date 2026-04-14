@@ -2,6 +2,7 @@
 
 import { connectDB } from "../db/connection";
 import User from "../db/models/user";
+import { getUser } from "../data/user";
 import FocusSession from "../db/models/focus-session";
 import SocialSession from "../db/models/social-session";
 import Urge from "../db/models/urge";
@@ -9,7 +10,6 @@ import DailyLog from "../db/models/daily-log";
 import { requireUserId } from "../auth/session";
 import { updateSettingsSchema } from "../validators/settings";
 import type { ActionResult } from "../types";
-import mongoose from "mongoose";
 
 export async function updateSettings(
   input: unknown
@@ -45,7 +45,10 @@ export async function updateSettings(
       if (data.socialWindowDefaults.maxPerDay !== undefined) updateFields["settings.socialWindowDefaults.maxPerDay"] = data.socialWindowDefaults.maxPerDay;
     }
 
-    await User.findByIdAndUpdate(userId, { $set: updateFields });
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+    
+    await User.findByIdAndUpdate(user._id, { $set: updateFields });
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -59,9 +62,12 @@ export async function exportUserData(): Promise<ActionResult<string>> {
     const userId = await requireUserId();
     await connectDB();
 
-    const oid = new mongoose.Types.ObjectId(userId);
-    const [user, sessions, socialSessions, urges, dailyLogs] = await Promise.all([
-      User.findById(userId).select("-passwordHash").lean(),
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
+    const oid = user._id;
+    const [userData, sessions, socialSessions, urges, dailyLogs] = await Promise.all([
+      User.findById(oid).select("-passwordHash").lean(),
       FocusSession.find({ userId: oid }).lean(),
       SocialSession.find({ userId: oid }).lean(),
       Urge.find({ userId: oid }).lean(),
@@ -70,7 +76,7 @@ export async function exportUserData(): Promise<ActionResult<string>> {
 
     const exportData = {
       exportedAt: new Date().toISOString(),
-      user,
+      user: userData,
       focusSessions: sessions,
       socialSessions,
       urges,
@@ -95,7 +101,10 @@ export async function deleteAccount(
     const userId = await requireUserId();
     await connectDB();
 
-    const oid = new mongoose.Types.ObjectId(userId);
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
+    const oid = user._id;
 
     // Hard delete all user data across all collections
     await Promise.all([
@@ -103,7 +112,7 @@ export async function deleteAccount(
       SocialSession.deleteMany({ userId: oid }),
       Urge.deleteMany({ userId: oid }),
       DailyLog.deleteMany({ userId: oid }),
-      User.findByIdAndDelete(userId),
+      User.findByIdAndDelete(oid),
     ]);
 
     return { success: true, data: undefined };

@@ -7,7 +7,6 @@ import { requireUserId } from "../auth/session";
 import { dailyCheckinSchema, workStartSchema } from "../validators/daily-log";
 import { getTodayString } from "../utils/date";
 import type { ActionResult } from "../types";
-import mongoose from "mongoose";
 
 export async function saveDailyCheckin(
   input: unknown
@@ -21,10 +20,11 @@ export async function saveDailyCheckin(
 
     await connectDB();
     const user = await getUser(userId);
-    const dateStr = getTodayString(user?.settings?.timezone);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+    const dateStr = getTodayString(user.settings?.timezone);
 
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       {
         $set: {
           sleep: parsed.data.sleep,
@@ -55,10 +55,11 @@ export async function saveWorkStart(
 
     await connectDB();
     const user = await getUser(userId);
-    const dateStr = getTodayString(user?.settings?.timezone);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+    const dateStr = getTodayString(user.settings?.timezone);
 
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       {
         $set: {
           workStart: {
@@ -83,10 +84,11 @@ export async function saveWorkStart(
 export async function getTodayLog(userId: string) {
   await connectDB();
   const user = await getUser(userId);
-  const dateStr = getTodayString(user?.settings?.timezone);
+  if (!user) return null;
+  const dateStr = getTodayString(user.settings?.timezone);
 
   return DailyLog.findOne({
-    userId: new mongoose.Types.ObjectId(userId),
+    userId: user._id,
     date: dateStr,
   })
     .select("-__v -userId") // Sanitize internal metadata

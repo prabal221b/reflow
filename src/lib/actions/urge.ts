@@ -10,7 +10,6 @@ import { logUrgeSchema, logRelapseSchema } from "../validators/urge";
 import { getTodayString } from "../utils/date";
 import { getRecoveryMessage } from "../utils/recovery-messages";
 import type { ActionResult } from "../types";
-import mongoose from "mongoose";
 
 export async function logUrge(
   input: unknown
@@ -24,10 +23,11 @@ export async function logUrge(
 
     await connectDB();
     const user = await getUser(userId);
-    const dateStr = getTodayString(user?.settings?.timezone);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+    const dateStr = getTodayString(user.settings?.timezone);
 
     const urge = await Urge.create({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       trigger: parsed.data.trigger,
       context: parsed.data.context,
       resultedInRelapse: false,
@@ -37,7 +37,7 @@ export async function logUrge(
 
     // Update daily log
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       { $inc: { "summary.urgesLogged": 1 } },
       { upsert: true }
     );
@@ -61,10 +61,11 @@ export async function logRelapse(
 
     await connectDB();
     const user = await getUser(userId);
-    const dateStr = getTodayString(user?.settings?.timezone);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+    const dateStr = getTodayString(user.settings?.timezone);
 
     await Urge.create({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       trigger: parsed.data.trigger,
       resultedInRelapse: true,
       relapse: {
@@ -77,7 +78,7 @@ export async function logRelapse(
 
     // Update daily log
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       {
         $inc: {
           "summary.urgesLogged": 1,
@@ -89,7 +90,7 @@ export async function logRelapse(
     );
 
     // Reset consecutive successes
-    await User.findByIdAndUpdate(userId, { consecutiveSuccesses: 0 });
+    await User.findByIdAndUpdate(user._id, { consecutiveSuccesses: 0 });
 
     const recoveryMessage = getRecoveryMessage();
 

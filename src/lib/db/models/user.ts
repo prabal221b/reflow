@@ -1,5 +1,8 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { DEFAULT_SETTINGS } from "../../constants";
+import { randomBytes } from "crypto";
+
+const generatePublicId = () => `u_${randomBytes(6).toString("hex")}`;
 
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
@@ -8,6 +11,7 @@ export interface IUser extends Document {
   passwordHash?: string;
   provider: "credentials" | "google";
   providerId?: string;
+  publicId: string;
 
   onboarding: {
     completed: boolean;
@@ -74,6 +78,13 @@ const UserSchema = new Schema<IUser>(
       default: "credentials",
     },
     providerId: { type: String },
+    publicId: {
+      type: String,
+      unique: true,
+      required: true,
+      index: true,
+      default: generatePublicId,
+    },
 
     onboarding: {
       completed: { type: Boolean, default: false },

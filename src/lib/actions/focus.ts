@@ -10,7 +10,6 @@ import { startFocusSchema, completeFocusSchema, sessionIdSchema } from "../valid
 import { getTodayString } from "../utils/date";
 import { SESSION_GRACE_PERIOD, SESSIONS_BEFORE_PROGRESSION } from "../constants";
 import type { ActionResult } from "../types";
-import mongoose from "mongoose";
 
 export async function startFocusSession(
   input: unknown
@@ -24,9 +23,12 @@ export async function startFocusSession(
 
     await connectDB();
 
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
     // Check for existing active session
     const existing = await FocusSession.findOne({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       status: { $in: ["active", "paused"] },
     });
 
@@ -38,11 +40,10 @@ export async function startFocusSession(
     const durationSeconds = duration * 60;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + (durationSeconds + SESSION_GRACE_PERIOD) * 1000);
-    const user = await getUser(userId);
-    const dateStr = getTodayString(user?.settings?.timezone);
+    const dateStr = getTodayString(user.settings?.timezone);
 
     const session = await FocusSession.create({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       type: type || "regular",
       status: "active",
       plannedDuration: durationSeconds,
@@ -55,18 +56,18 @@ export async function startFocusSession(
 
     // Update daily log attempt count
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       {
         $inc: { "summary.sessionsAttempted": 1 },
         $setOnInsert: {
-          focusTarget: { sessions: 3, minutesPerSession: user?.currentFocusInterval || 8 },
+          focusTarget: { sessions: 3, minutesPerSession: user.currentFocusInterval || 8 },
         },
       },
       { upsert: true }
     );
 
     // Update last active
-    await User.findByIdAndUpdate(userId, { lastActiveAt: now });
+    await User.findByIdAndUpdate(user._id, { lastActiveAt: now });
 
     return {
       success: true,
@@ -92,11 +93,14 @@ export async function pauseFocusSession(
       return { success: false, error: "Invalid session", code: "VALIDATION" };
     }
 
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
     await connectDB();
     const session = await FocusSession.findOneAndUpdate(
       {
         _id: parsed.data.sessionId,
-        userId: new mongoose.Types.ObjectId(userId),
+        userId: user._id,
         status: "active",
       },
       { status: "paused", pausedAt: new Date() },
@@ -124,10 +128,13 @@ export async function resumeFocusSession(
       return { success: false, error: "Invalid session", code: "VALIDATION" };
     }
 
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
     await connectDB();
     const session = await FocusSession.findOne({
       _id: parsed.data.sessionId,
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       status: "paused",
     });
 
@@ -162,10 +169,13 @@ export async function completeFocusSession(
       return { success: false, error: parsed.error.issues[0]?.message || "Invalid input", code: "VALIDATION" };
     }
 
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
     await connectDB();
     const session = await FocusSession.findOne({
       _id: parsed.data.sessionId,
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       status: { $in: ["active", "paused"] },
     });
 
@@ -187,8 +197,7 @@ export async function completeFocusSession(
     const dateStr = session.date;
 
     // Consolidate non-dependent writes into a single parallel operation
-    const [user] = await Promise.all([
-      getUser(userId),
+    await Promise.all([
       FocusSession.findByIdAndUpdate(session._id, {
         status: "completed",
         completedAt: now,
@@ -200,7 +209,7 @@ export async function completeFocusSession(
         },
       }),
       DailyLog.findOneAndUpdate(
-        { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+        { userId: user._id, date: dateStr },
         {
           $inc: {
             "summary.sessionsCompleted": 1,
@@ -219,12 +228,12 @@ export async function completeFocusSession(
       if (newConsecutive >= SESSIONS_BEFORE_PROGRESSION) {
         const speedMultiplier = user.settings.progressionSpeed === "slow" ? 1 : user.settings.progressionSpeed === "fast" ? 3 : 2;
         const newInterval = Math.min(45, user.currentFocusInterval + speedMultiplier);
-        await User.findByIdAndUpdate(userId, {
+        await User.findByIdAndUpdate(user._id, {
           currentFocusInterval: newInterval,
           consecutiveSuccesses: 0,
         });
       } else {
-        await User.findByIdAndUpdate(userId, {
+        await User.findByIdAndUpdate(user._id, {
           consecutiveSuccesses: newConsecutive,
         });
       }
@@ -247,11 +256,14 @@ export async function cancelFocusSession(
       return { success: false, error: "Invalid session", code: "VALIDATION" };
     }
 
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
     await connectDB();
     const result = await FocusSession.findOneAndUpdate(
       {
         _id: parsed.data.sessionId,
-        userId: new mongoose.Types.ObjectId(userId),
+        userId: user._id,
         status: { $in: ["active", "paused"] },
       },
       { status: "cancelled", completedAt: new Date() }
@@ -262,7 +274,7 @@ export async function cancelFocusSession(
     }
 
     // Reset consecutive successes on cancel
-    await User.findByIdAndUpdate(userId, { consecutiveSuccesses: 0 });
+    await User.findByIdAndUpdate(user._id, { consecutiveSuccesses: 0 });
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -273,12 +285,15 @@ export async function cancelFocusSession(
 
 export async function getActiveSession() {
   const userId = await requireUserId();
+  const user = await getUser(userId);
+  if (!user) return null;
+
   await connectDB();
   
   // Also expire any old active sessions
   await FocusSession.updateMany(
     {
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       status: { $in: ["active", "paused"] },
       expiresAt: { $lt: new Date() },
     },
@@ -286,7 +301,7 @@ export async function getActiveSession() {
   );
 
   const session = await FocusSession.findOne({
-    userId: new mongoose.Types.ObjectId(userId),
+    userId: user._id,
     status: { $in: ["active", "paused"] },
   })
     .select("-__v -userId") // Sanitize internal metadata

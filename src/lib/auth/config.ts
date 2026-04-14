@@ -38,8 +38,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           return {
-            id: user._id.toString(),
+            id: user.publicId,
+            publicId: user.publicId,
             name: user.name,
+            _id: user._id.toString(),
           };
         } catch {
           return null;
@@ -63,12 +65,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user, account, profile }) {
-      if (user) {
-        token.userId = user.id;
+    async jwt({ token, user: nextUser, account, profile }) {
+      if (nextUser) {
+        const u = nextUser as { id: string; publicId?: string; _id?: string; internalId?: string };
+        token.userId = u.publicId || u.id;
+        token.internalId = u._id || u.internalId;
       }
-
-      // Sync Google user to our DB on first sign-in
+      
+      // Sync Google user
       if (account?.provider === "google" && profile?.email) {
         try {
           await connectDB();
@@ -88,7 +92,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             });
           }
 
-          token.userId = dbUser._id.toString();
+          token.userId = dbUser.publicId;
+          token.internalId = dbUser._id.toString();
         } catch (error) {
           console.error(
             "Auth: Google sync failed:",
@@ -101,9 +106,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (token.userId) {
-        // Strip image and email from public session if they aren't strictly needed for the UI profile.
-        // We'll keep 'name' as it's used for the "Welcome Tanay" UI.
+        // Expose ONLY the publicId as the user.id to the frontend
         session.user.id = token.userId as string;
+        
         const user = session.user as { name?: string; email?: string; image?: string; id?: string };
         delete user.email;
         delete user.image;

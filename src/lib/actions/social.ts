@@ -3,13 +3,11 @@
 import { connectDB } from "../db/connection";
 import SocialSession from "../db/models/social-session";
 import DailyLog from "../db/models/daily-log";
-import User from "../db/models/user";
 import { getUser } from "../data/user";
 import { requireUserId } from "../auth/session";
 import { scheduleSocialSchema, logCheckSchema } from "../validators/social";
 import { getTodayString } from "../utils/date";
 import type { ActionResult } from "../types";
-import mongoose from "mongoose";
 
 export async function scheduleSocialWindow(
   input: unknown
@@ -22,7 +20,8 @@ export async function scheduleSocialWindow(
     }
 
     await connectDB();
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
     const dateStr = getTodayString(user?.settings?.timezone);
 
     // Parse the time string to create a scheduled start date
@@ -31,7 +30,7 @@ export async function scheduleSocialWindow(
     scheduledStart.setHours(hours, minutes, 0, 0);
 
     const session = await SocialSession.create({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       type: "planned",
       status: "scheduled",
       platform: parsed.data.platform,
@@ -42,7 +41,7 @@ export async function scheduleSocialWindow(
     });
 
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       { $inc: { "summary.plannedSocialWindows": 1 } },
       { upsert: true }
     );
@@ -62,10 +61,13 @@ export async function startSocialWindow(
     const userId = await requireUserId();
     await connectDB();
 
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
     const result = await SocialSession.findOneAndUpdate(
       {
         _id: windowId,
-        userId: new mongoose.Types.ObjectId(userId),
+        userId: user._id,
         status: "scheduled",
       },
       {
@@ -94,10 +96,13 @@ export async function completeSocialWindow(
     const userId = await requireUserId();
     await connectDB();
 
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
+
     const result = await SocialSession.findOneAndUpdate(
       {
         _id: windowId,
-        userId: new mongoose.Types.ObjectId(userId),
+        userId: user._id,
         status: "active",
       },
       { status: "completed", actualDuration }
@@ -107,11 +112,10 @@ export async function completeSocialWindow(
       return { success: false, error: "Window not found", code: "NOT_FOUND" };
     }
 
-    const user = await getUser(userId);
-    const dateStr = getTodayString(user?.settings?.timezone);
+    const dateStr = getTodayString(user.settings?.timezone);
 
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       { $inc: { "summary.actualSocialWindows": 1 } },
       { upsert: true }
     );
@@ -134,11 +138,12 @@ export async function logUnplannedCheck(
     }
 
     await connectDB();
-    const user = await User.findById(userId);
+    const user = await getUser(userId);
+    if (!user) return { success: false, error: "User not found", code: "NOT_FOUND" };
     const dateStr = getTodayString(user?.settings?.timezone);
 
     await SocialSession.create({
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: user._id,
       type: "unplanned",
       status: "completed",
       platform: parsed.data.platform,
@@ -148,7 +153,7 @@ export async function logUnplannedCheck(
     });
 
     await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+      { userId: user._id, date: dateStr },
       { $inc: { "summary.unplannedChecks": 1 } },
       { upsert: true }
     );
@@ -163,10 +168,11 @@ export async function logUnplannedCheck(
 export async function getTodaySocialSessions(userId: string) {
   await connectDB();
   const user = await getUser(userId);
-  const dateStr = getTodayString(user?.settings?.timezone);
+  if (!user) return [];
+  const dateStr = getTodayString(user.settings?.timezone);
 
   return SocialSession.find({
-    userId: new mongoose.Types.ObjectId(userId),
+    userId: user._id,
     date: dateStr,
   })
     .select("-__v -userId") // Sanitize internal metadata
