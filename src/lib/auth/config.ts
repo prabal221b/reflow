@@ -134,19 +134,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     maxAge: 30 * 24 * 60 * 60,
   },
   logger: {
-    error(code, metadata) {
+    error(error) {
       // Suppress the noisy CredentialsSignin stack trace in development
-      if (code.name === "CredentialsSignin" || code.code === "credentials_signin") {
+      if (error.name === "CredentialsSignin") {
         console.log("Auth: Invalid credentials attempt (CredentialsSignin)");
         return;
       }
-      console.error(`Auth Error: ${code.name || "Unknown error"}`);
+      console.error(`Auth Error: ${error.name || "Unknown error"}`);
     },
     warn(code) {
-      console.warn(code);
+      console.warn(`Auth Warning: ${code}`);
     },
     debug(code, metadata) {
-      // console.log(code, metadata);
+      // console.log(`Auth Debug: ${code}`, metadata);
     },
   },
   secret: process.env.AUTH_SECRET,
