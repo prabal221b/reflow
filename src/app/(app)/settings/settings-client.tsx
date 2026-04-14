@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -43,23 +43,34 @@ interface SettingsData {
   socialWindowDefaults: { duration: number; maxPerDay: number };
 }
 
-export function SettingsClient({ settings }: { settings: SettingsData }) {
+export function SettingsClient({ settings: initialSettings }: { settings: SettingsData }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localSettings, setLocalSettings] = useState(initialSettings);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { theme, setTheme } = useTheme();
   const router = useRouter();
 
+  // Sync local state when props update (from router.refresh)
+  useEffect(() => {
+    setLocalSettings(initialSettings);
+  }, [initialSettings]);
+
   const handleUpdate = async (data: Record<string, unknown>) => {
-    setIsSubmitting(true);
+    const previousSettings = { ...localSettings };
+    
+    // Extract nested updates if any (like notifications)
+    // For simplicity in this flat record, we'll just merge
+    setLocalSettings((prev) => ({ ...prev, ...data }));
+
     const result = await updateSettings(data);
     if (result.success) {
       toast.success("Settings saved");
       router.refresh();
     } else {
+      setLocalSettings(previousSettings);
       toast.error(result.error);
     }
-    setIsSubmitting(false);
   };
 
   const handleExport = async () => {
@@ -108,12 +119,12 @@ export function SettingsClient({ settings }: { settings: SettingsData }) {
           <CardContent className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-[var(--muted-foreground)]">Name</span>
-              <span className="font-medium">{settings.name}</span>
+              <span className="font-medium">{localSettings.name}</span>
             </div>
             <div className="h-px bg-[var(--border)]" />
             <div className="flex justify-between text-sm">
               <span className="text-[var(--muted-foreground)]">Email</span>
-              <span className="font-medium">{settings.email}</span>
+              <span className="font-medium">{localSettings.email}</span>
             </div>
           </CardContent>
         </Card>
@@ -132,13 +143,13 @@ export function SettingsClient({ settings }: { settings: SettingsData }) {
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-[var(--muted-foreground)]">Current interval</span>
-                <span className="font-medium">{settings.currentFocusInterval} min</span>
+                <span className="font-medium">{localSettings.currentFocusInterval} min</span>
               </div>
               <div className="flex gap-2">
                 {[5, 8, 10, 15, 20, 25].map((d) => (
                   <button key={d} onClick={() => handleUpdate({ focusInterval: d })} className={cn(
                     "flex-1 rounded-lg py-2 text-sm transition-colors",
-                    settings.focusInterval === d ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "bg-[var(--muted)]"
+                    localSettings.focusInterval === d ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "bg-[var(--muted)]"
                   )}>{d}</button>
                 ))}
               </div>
@@ -148,7 +159,7 @@ export function SettingsClient({ settings }: { settings: SettingsData }) {
               <p className="text-sm text-[var(--muted-foreground)] mb-2">Progression</p>
               <div className="flex gap-2">
                 {["auto", "manual"].map((p) => (
-                  <Button key={p} variant={settings.focusProgression === p ? "default" : "outline"} size="sm"
+                  <Button key={p} variant={localSettings.focusProgression === p ? "default" : "outline"} size="sm"
                     onClick={() => handleUpdate({ focusProgression: p })} className="capitalize">
                     {p}
                   </Button>
@@ -191,21 +202,21 @@ export function SettingsClient({ settings }: { settings: SettingsData }) {
               </div>
               <button
                 role="switch"
-                aria-checked={settings.reducedMotion}
+                aria-checked={localSettings.reducedMotion}
                 aria-label="Reduce motion"
                 onClick={() => {
-                  const newVal = !settings.reducedMotion;
+                  const newVal = !localSettings.reducedMotion;
                   localStorage.setItem("reflow-reduced-motion", String(newVal));
                   handleUpdate({ reducedMotion: newVal });
                 }}
                 className={cn(
                   "relative h-6 w-11 rounded-full transition-colors",
-                  settings.reducedMotion ? "bg-[var(--primary)]" : "bg-[var(--muted)]"
+                  localSettings.reducedMotion ? "bg-[var(--primary)]" : "bg-[var(--muted)]"
                 )}
               >
                 <div className={cn(
                   "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                  settings.reducedMotion ? "translate-x-5" : "translate-x-0.5"
+                  localSettings.reducedMotion ? "translate-x-5" : "translate-x-0.5"
                 )} />
               </button>
             </div>
@@ -226,12 +237,12 @@ export function SettingsClient({ settings }: { settings: SettingsData }) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-sm text-[var(--muted-foreground)]">Start</label>
-                <Input type="time" defaultValue={settings.workdayStart}
+                <Input type="time" defaultValue={localSettings.workdayStart}
                   onBlur={(e) => handleUpdate({ workdayStart: e.target.value })} />
               </div>
               <div className="space-y-1">
                 <label className="text-sm text-[var(--muted-foreground)]">End</label>
-                <Input type="time" defaultValue={settings.workdayEnd}
+                <Input type="time" defaultValue={localSettings.workdayEnd}
                   onBlur={(e) => handleUpdate({ workdayEnd: e.target.value })} />
               </div>
             </div>

@@ -79,7 +79,24 @@ export function FocusClient({
   }, [phase]);
 
   const handleStart = async () => {
+    const previousPhase = phase;
+    const previousSession = session;
+    
+    // Optimistic Update
+    const tempSession: ActiveSessionData = {
+      id: "temp_session",
+      status: "active",
+      type: sessionType,
+      startedAt: new Date().toISOString(),
+      plannedDuration: selectedDuration * 60,
+      pausedDuration: 0,
+      task: task.trim() || undefined,
+    };
+    
+    setPhase("active");
+    setSession(tempSession);
     setIsSubmitting(true);
+
     const result = await startFocusSession({
       duration: selectedDuration,
       task: task.trim() || undefined,
@@ -87,19 +104,18 @@ export function FocusClient({
     });
 
     if (result.success) {
-      const newSession: ActiveSessionData = {
+      // Sync with real data
+      const realSession: ActiveSessionData = {
+        ...tempSession,
         id: result.data.sessionId,
-        status: "active",
-        type: sessionType,
         startedAt: result.data.startedAt,
-        plannedDuration: selectedDuration * 60,
-        pausedDuration: 0,
-        task: task.trim() || undefined,
       };
-      setSession(newSession);
+      setSession(realSession);
       save("activeSession", { id: result.data.sessionId, startedAt: result.data.startedAt });
-      setPhase("active");
     } else {
+      // Rollback
+      setPhase(previousPhase);
+      setSession(previousSession);
       toast.error(result.error);
     }
     setIsSubmitting(false);
@@ -107,20 +123,28 @@ export function FocusClient({
 
   const handlePause = async () => {
     if (!session) return;
+    const previousPaused = isPaused;
+    
+    // Optimistic Update
+    setIsPaused(true);
+    
     const result = await pauseFocusSession({ sessionId: session.id });
-    if (result.success) {
-      setIsPaused(true);
-    } else {
+    if (!result.success) {
+      setIsPaused(previousPaused);
       toast.error(result.error);
     }
   };
 
   const handleResume = async () => {
     if (!session) return;
+    const previousPaused = isPaused;
+    
+    // Optimistic Update
+    setIsPaused(false);
+    
     const result = await resumeFocusSession({ sessionId: session.id });
-    if (result.success) {
-      setIsPaused(false);
-    } else {
+    if (!result.success) {
+      setIsPaused(previousPaused);
       toast.error(result.error);
     }
   };
@@ -131,7 +155,13 @@ export function FocusClient({
 
   const handleComplete = async () => {
     if (!session || !selectedRating) return;
+    const previousPhase = phase;
+    
+    // Optimistic Update
+    setPhase("complete");
+    remove("activeSession");
     setIsSubmitting(true);
+
     const result = await completeFocusSession({
       sessionId: session.id,
       rating: selectedRating as "great" | "okay" | "struggled" | "interrupted",
@@ -139,10 +169,9 @@ export function FocusClient({
     });
 
     if (result.success) {
-      remove("activeSession");
-      setPhase("complete");
       toast.success("Session complete. Well done.", { duration: 3000 });
     } else {
+      setPhase(previousPhase);
       toast.error(result.error);
     }
     setIsSubmitting(false);
@@ -150,12 +179,18 @@ export function FocusClient({
 
   const handleCancel = async () => {
     if (!session) return;
+    const previousPhase = phase;
+    const previousSession = session;
+
+    // Optimistic Update
+    setPhase("launcher");
+    setSession(null);
+    remove("activeSession");
+
     const result = await cancelFocusSession({ sessionId: session.id });
-    if (result.success) {
-      remove("activeSession");
-      setSession(null);
-      setPhase("launcher");
-    } else {
+    if (!result.success) {
+      setPhase(previousPhase);
+      setSession(previousSession);
       toast.error(result.error);
     }
   };

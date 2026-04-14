@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,11 +26,17 @@ interface SessionData {
   actualStart: string | null;
 }
 
-export function SocialClient({ sessions }: { sessions: SessionData[] }) {
+export function SocialClient({ sessions: initialSessions }: { sessions: SessionData[] }) {
   const [showSchedule, setShowSchedule] = useState(false);
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localSessions, setLocalSessions] = useState(initialSessions);
   const router = useRouter();
+
+  // Sync local state when props update
+  useEffect(() => {
+    setLocalSessions(initialSessions);
+  }, [initialSessions]);
 
   // Schedule form
   const [platform, setPlatform] = useState<Platform>("instagram");
@@ -42,51 +48,102 @@ export function SocialClient({ sessions }: { sessions: SessionData[] }) {
   const [logPlatform, setLogPlatform] = useState<Platform>("instagram");
   const [logDuration, setLogDuration] = useState(5);
 
-  const planned = sessions.filter((s) => s.type === "planned");
-  const unplanned = sessions.filter((s) => s.type === "unplanned");
+  const planned = localSessions.filter((s) => s.type === "planned");
+  const unplanned = localSessions.filter((s) => s.type === "unplanned");
 
   const handleSchedule = async () => {
+    const previousSessions = [...localSessions];
+    const tempId = "temp_" + Date.now();
+    
+    // Optimistic Update
+    const tempSession: SessionData = {
+      id: tempId,
+      type: "planned",
+      status: "scheduled",
+      platform,
+      intent: intent || null,
+      scheduledDuration: duration,
+      actualDuration: null,
+      actualStart: null,
+    };
+
+    setLocalSessions(prev => [tempSession, ...prev]);
+    setShowSchedule(false);
+    setIntent("");
     setIsSubmitting(true);
+
     const result = await scheduleSocialWindow({ platform, startTime, duration, intent: intent || undefined });
     if (result.success) {
       toast.success("Window scheduled");
-      setShowSchedule(false);
-      setIntent("");
       router.refresh();
     } else {
+      setLocalSessions(previousSessions);
       toast.error(result.error);
     }
     setIsSubmitting(false);
   };
 
   const handleQuickLog = async () => {
+    const previousSessions = [...localSessions];
+    
+    // Optimistic Update
+    const tempSession: SessionData = {
+      id: "temp_" + Date.now(),
+      type: "unplanned",
+      status: "completed",
+      platform: logPlatform,
+      intent: null,
+      scheduledDuration: null,
+      actualDuration: logDuration,
+      actualStart: new Date().toISOString(),
+    };
+
+    setLocalSessions(prev => [tempSession, ...prev]);
+    setShowQuickLog(false);
     setIsSubmitting(true);
+
     const result = await logUnplannedCheck({ platform: logPlatform, duration: logDuration });
     if (result.success) {
       toast("Logged. Awareness is the first step.", { duration: 3000 });
-      setShowQuickLog(false);
       router.refresh();
     } else {
+      setLocalSessions(previousSessions);
       toast.error(result.error);
     }
     setIsSubmitting(false);
   };
 
   const handleStartWindow = async (windowId: string) => {
+    const previousSessions = [...localSessions];
+    
+    // Optimistic Update
+    setLocalSessions(prev => prev.map(s => 
+      s.id === windowId ? { ...s, status: "active" } : s
+    ));
+
     const result = await startSocialWindow(windowId);
     if (result.success) {
       router.refresh();
     } else {
+      setLocalSessions(previousSessions);
       toast.error(result.error);
     }
   };
 
   const handleCompleteWindow = async (windowId: string) => {
+    const previousSessions = [...localSessions];
+    
+    // Optimistic Update
+    setLocalSessions(prev => prev.map(s => 
+      s.id === windowId ? { ...s, status: "completed" } : s
+    ));
+
     const result = await completeSocialWindow(windowId, 15);
     if (result.success) {
       toast.success("Window completed");
       router.refresh();
     } else {
+      setLocalSessions(previousSessions);
       toast.error(result.error);
     }
   };

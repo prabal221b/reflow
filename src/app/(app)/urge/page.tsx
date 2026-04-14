@@ -23,33 +23,40 @@ export default function UrgePage() {
   const router = useRouter();
 
   const handleLogUrge = async () => {
+    // Optimistic Update
+    toast.success("Urge logged. Awareness is power.");
+    router.push("/dashboard");
     setIsSubmitting(true);
+
     const result = await logUrge({ trigger: selectedTrigger });
-    setIsSubmitting(false);
-    if (result.success) {
-      toast.success("Urge logged. Awareness is power.");
-      router.push("/dashboard");
-      router.refresh();
-    } else {
+    if (!result.success) {
       toast.error(result.error);
     }
+    setIsSubmitting(false);
   };
 
   const handleLogRelapse = async () => {
     if (!selectedPlatform) return;
+    const previousMode = mode;
+    
+    // Optimistic Update
+    setMode("done");
+    setRecoveryMessage("One moment while we prepare your recovery reflection...");
     setIsSubmitting(true);
+
     const result = await logRelapse({
       platform: selectedPlatform,
       estimatedDuration: duration,
       trigger: selectedTrigger,
     });
-    setIsSubmitting(false);
+
     if (result.success) {
       setRecoveryMessage(result.data.recoveryMessage);
-      setMode("done");
     } else {
+      setMode(previousMode);
       toast.error(result.error);
     }
+    setIsSubmitting(false);
   };
 
   return (

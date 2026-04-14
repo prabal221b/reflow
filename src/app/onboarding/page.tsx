@@ -80,16 +80,25 @@ export default function OnboardingPage() {
   };
 
   const handleNext = async () => {
-    setIsSubmitting(true);
+    const previousStep = step;
+    let isLastStep = false;
+    
+    // Validate current step before optimistic jump
+    if (step === 0 && (!name.trim() || selectedConcerns.length === 0)) {
+      toast.error("Please enter your name and select at least one concern");
+      return;
+    }
+
+    // Optimistic Update (for non-final steps)
+    if (step < 4) {
+      setStep((s) => s + 1);
+    } else {
+      setIsSubmitting(true);
+    }
+
     try {
-      let isLastStep = false;
       switch (step) {
         case 0:
-          if (!name.trim() || selectedConcerns.length === 0) {
-            toast.error("Please enter your name and select at least one concern");
-            setIsSubmitting(false);
-            return;
-          }
           await saveOnboardingStep("welcome", { name: name.trim() });
           break;
         case 1:
@@ -128,18 +137,15 @@ export default function OnboardingPage() {
             router.push("/dashboard");
           } else {
             toast.error(result.error);
+            setIsSubmitting(false);
           }
           break;
         }
       }
-
-      if (!isLastStep) {
-        setStep((s) => s + 1);
-        setIsSubmitting(false);
-      }
     } catch (err) {
       console.error("Onboarding error:", err);
-      toast.error("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Reverting step.");
+      setStep(previousStep);
       setIsSubmitting(false);
     }
   };

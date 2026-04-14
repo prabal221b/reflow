@@ -28,17 +28,23 @@ export function WorkdayClient() {
 
   const handleCheckin = async () => {
     if (!energy && !fog && !sleepDuration) return;
+    
+    // Optimistic Update
+    setCheckinDone(true);
+    setShowCheckin(false);
     setIsSubmitting(true);
+
     const result = await saveDailyCheckin({
       sleep: sleepDuration ? { duration: sleepDuration } : undefined,
       energy: energy || undefined,
       fog: fog || undefined,
     });
+    
     if (result.success) {
-      setCheckinDone(true);
-      setShowCheckin(false);
       toast.success("Check-in saved");
     } else {
+      setCheckinDone(false);
+      setShowCheckin(true);
       toast.error(result.error);
     }
     setIsSubmitting(false);
@@ -49,13 +55,16 @@ export function WorkdayClient() {
       toast.error("Enter your first step");
       return;
     }
+    
+    // Optimistic Update
+    setIsStarted(true);
+    toast.success("Workday started. Let's go.");
+    router.push("/focus");
     setIsSubmitting(true);
+
     const result = await saveWorkStart({ firstStep: firstStep.trim(), noScrollCommitment: noScroll });
-    if (result.success) {
-      setIsStarted(true);
-      toast.success("Workday started. Let's go.");
-      router.push("/focus");
-    } else {
+    if (!result.success) {
+      setIsStarted(false);
       toast.error(result.error);
     }
     setIsSubmitting(false);
