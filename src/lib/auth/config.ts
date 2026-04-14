@@ -120,8 +120,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (error.name === "CredentialsSignin") return;
       console.error(`Auth Error: ${error.name}`);
     },
-    warn(_code) { /* suppress */ },
-    debug(_code, _metadata) { /* no-op */ },
+    warn() { /* suppress */ },
+    debug() { /* no-op */ },
   },
   secret: process.env.AUTH_SECRET,
   trustHost: true,

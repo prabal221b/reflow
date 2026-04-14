@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { FadeIn } from "@/components/shared/motion-wrapper";
 import { useTimer } from "@/lib/hooks/use-timer";
 import { useLocalBackup } from "@/lib/hooks/use-local-backup";
-import { formatTimer, formatDuration } from "@/lib/utils/time";
+import { formatTimer } from "@/lib/utils/time";
 import {
   startFocusSession,
   pauseFocusSession,
@@ -428,7 +428,7 @@ function ActiveTimer({
             {session.task || "Active Work"}
           </h2>
           <p className="text-sm text-[var(--muted-foreground)] italic opacity-60 transition-opacity duration-1000">
-            "{mantras[mantraIndex]}"
+            &quot;{mantras[mantraIndex]}&quot;
           </p>
         </div>
 

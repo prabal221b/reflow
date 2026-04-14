@@ -103,7 +103,7 @@ export type ActionResult<T = void> =
   | {
       success: false;
       error: string;
-      code: "VALIDATION" | "AUTH" | "NOT_FOUND" | "CONFLICT" | "SERVER";
+      code: "VALIDATION" | "AUTH" | "NOT_FOUND" | "CONFLICT" | "SERVER" | "RATE_LIMIT";
     };
 
 // Onboarding responses
