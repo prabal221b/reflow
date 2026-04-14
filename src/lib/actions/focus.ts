@@ -183,36 +183,33 @@ export async function completeFocusSession(
     );
     const actualMinutes = Math.round(actualDuration / 60);
 
-    await FocusSession.findByIdAndUpdate(session._id, {
-      status: "completed",
-      completedAt: now,
-      actualDuration,
-      pausedDuration: totalPaused,
-      postReflection: {
-        rating: parsed.data.rating,
-        note: parsed.data.note,
-      },
-    });
-
-    // Update daily log
-    const user = await User.findById(userId);
     const dateStr = session.date;
 
-
-
-
-
-    await DailyLog.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
-      {
-        $inc: {
-          "summary.sessionsCompleted": 1,
-          "summary.totalFocusMinutes": actualMinutes,
+    // Consolidate non-dependent writes into a single parallel operation
+    const [user] = await Promise.all([
+      User.findById(userId),
+      FocusSession.findByIdAndUpdate(session._id, {
+        status: "completed",
+        completedAt: now,
+        actualDuration,
+        pausedDuration: totalPaused,
+        postReflection: {
+          rating: parsed.data.rating,
+          note: parsed.data.note,
         },
-        $max: { "summary.longestSession": actualMinutes },
-      },
-      { upsert: true }
-    );
+      }),
+      DailyLog.findOneAndUpdate(
+        { userId: new mongoose.Types.ObjectId(userId), date: dateStr },
+        {
+          $inc: {
+            "summary.sessionsCompleted": 1,
+            "summary.totalFocusMinutes": actualMinutes,
+          },
+          $max: { "summary.longestSession": actualMinutes },
+        },
+        { upsert: true }
+      ),
+    ]);
 
     // Handle auto-progression
     if (user && user.settings.focusProgression === "auto" && parsed.data.rating !== "interrupted") {
@@ -273,7 +270,8 @@ export async function cancelFocusSession(
   }
 }
 
-export async function getActiveSession(userId: string) {
+export async function getActiveSession() {
+  const userId = await requireUserId();
   await connectDB();
   
   // Also expire any old active sessions

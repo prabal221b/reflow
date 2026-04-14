@@ -190,6 +190,9 @@ export function SettingsClient({ settings }: { settings: SettingsData }) {
                 <p className="text-xs text-[var(--muted-foreground)]">Minimize animations</p>
               </div>
               <button
+                role="switch"
+                aria-checked={settings.reducedMotion}
+                aria-label="Reduce motion"
                 onClick={() => {
                   const newVal = !settings.reducedMotion;
                   localStorage.setItem("reflow-reduced-motion", String(newVal));

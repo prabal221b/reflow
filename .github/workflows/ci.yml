@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Check Formatting & Linting
+        run: npm run lint
+        
+      - name: Type Check
+        run: npx tsc --noEmit
+        
+      - name: Test Build Readiness
+        run: npm run build
+        env:
+          # Mock environment variables required for Next.js build
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          MONGODB_URI: "mongodb://localhost:27017/reflow-test"
+          AUTH_SECRET: "mock-secret-for-ci-build"

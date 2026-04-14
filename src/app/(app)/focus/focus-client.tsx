@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
 
 type Phase = "launcher" | "pre_focus" | "active" | "post_focus" | "complete";
 
@@ -149,7 +150,6 @@ export function FocusClient({
 
   const handleCancel = async () => {
     if (!session) return;
-    if (!confirm("Cancel this session?")) return;
     const result = await cancelFocusSession({ sessionId: session.id });
     if (result.success) {
       remove("activeSession");
@@ -170,7 +170,7 @@ export function FocusClient({
       <FadeIn>
         <div className="flex items-center gap-3">
           {phase !== "launcher" && phase !== "active" && (
-            <button onClick={() => { setPhase("launcher"); setSession(null); }} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            <button aria-label="Go back" onClick={() => { setPhase("launcher"); setSession(null); }} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
               <ChevronLeft className="h-5 w-5" />
             </button>
           )}
@@ -210,6 +210,8 @@ export function FocusClient({
                   {durationOptions.map((d) => (
                     <button
                       key={d}
+                      aria-pressed={selectedDuration === d}
+                      aria-label={`${d} minutes`}
                       onClick={() => setSelectedDuration(d)}
                       className={cn(
                         "rounded-xl border px-4 py-3 text-sm font-medium transition-colors min-w-[60px]",
@@ -463,6 +465,7 @@ function ActiveTimer({
             />
           </svg>
           
+
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-6xl font-extralight tabular-nums tracking-tighter" role="timer">
               {formatTimer(remaining)}
@@ -473,23 +476,50 @@ function ActiveTimer({
                  style={{ width: `${progress * 100}%` }}
                />
             </div>
+            
+            {/* Screen reader only live region */}
+            <div aria-live="polite" aria-atomic="true" className="sr-only">
+              {isPaused ? "Timer paused" : remaining === 0 ? "Session complete" : `${Math.ceil(remaining / 60)} minutes remaining`}
+            </div>
           </div>
         </div>
 
         {/* Action Sanctuary */}
         <div className="glass rounded-[2.5rem] p-3 flex items-center gap-4 shadow-2xl">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-14 w-14 rounded-full hover:bg-rose-500/10 hover:text-rose-500 transition-all"
-            onClick={onCancel}
-          >
-            <Square className="h-5 w-5 fill-current" />
-          </Button>
+          <AlertDialog.Root>
+            <AlertDialog.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Cancel session"
+                className="h-14 w-14 rounded-full hover:bg-rose-500/10 hover:text-rose-500 transition-all"
+              >
+                <Square className="h-5 w-5 fill-current" />
+              </Button>
+            </AlertDialog.Trigger>
+            <AlertDialog.Portal>
+              <AlertDialog.Overlay className="fixed inset-0 bg-black/80 z-50 animate-in fade-in" />
+              <AlertDialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-sm translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg md:w-full bg-[var(--card)] border-[var(--border)]">
+                <AlertDialog.Title className="text-lg font-semibold">Cancel this session?</AlertDialog.Title>
+                <AlertDialog.Description className="text-sm text-[var(--muted-foreground)]">
+                  This will end your current session without recording a completion.
+                </AlertDialog.Description>
+                <div className="flex justify-end gap-3 mt-4">
+                  <AlertDialog.Cancel asChild>
+                    <Button variant="outline">Keep going</Button>
+                  </AlertDialog.Cancel>
+                  <AlertDialog.Action asChild onClick={onCancel}>
+                    <Button variant="destructive">Yes, cancel</Button>
+                  </AlertDialog.Action>
+                </div>
+              </AlertDialog.Content>
+            </AlertDialog.Portal>
+          </AlertDialog.Root>
 
           {isPaused ? (
             <Button
               size="icon"
+              aria-label="Resume session"
               className="h-20 w-20 rounded-full shadow-xl hover:scale-105 transition-transform"
               onClick={onResume}
             >
@@ -498,6 +528,7 @@ function ActiveTimer({
           ) : (
             <Button
               size="icon"
+              aria-label="Pause session"
               className="h-20 w-20 rounded-full shadow-xl hover:scale-105 transition-transform"
               onClick={onPause}
             >
@@ -508,6 +539,7 @@ function ActiveTimer({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Complete session"
             className="h-14 w-14 rounded-full hover:bg-[var(--success)]/10 hover:text-[var(--success)] transition-all"
             onClick={onComplete}
           >

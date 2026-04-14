@@ -11,7 +11,7 @@ export default async function FocusPage() {
   await connectDB();
 
   const user = await User.findById(userId).lean();
-  const activeSession = await getActiveSession(userId);
+  const activeSession = await getActiveSession();
 
   const focusInterval = user?.currentFocusInterval || user?.settings?.focusInterval || 8;
 
