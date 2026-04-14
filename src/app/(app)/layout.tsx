@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db/connection";
 import User from "@/lib/db/models/user";
 import { Sidebar, BottomNav } from "@/components/layout/navigation";
 import { UrgeFab } from "@/components/layout/urge-fab";
+import { AppProviders } from "@/components/providers/app-providers";
 
 export const unstable_instant = false;
 
@@ -23,15 +24,17 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="min-h-screen">
-      <Sidebar />
-      <main className="lg:pl-[var(--sidebar-width)]">
-        <div className="mx-auto max-w-3xl px-4 py-6 pb-24 lg:px-8 lg:py-8 lg:pb-8">
-          {children}
-        </div>
-      </main>
-      <BottomNav />
-      <UrgeFab />
-    </div>
+    <AppProviders>
+      <div className="min-h-screen">
+        <Sidebar />
+        <main className="lg:pl-[var(--sidebar-width)]">
+          <div className="mx-auto max-w-3xl px-4 py-6 pb-24 lg:px-8 lg:py-8 lg:pb-8">
+            {children}
+          </div>
+        </main>
+        <BottomNav />
+        <UrgeFab />
+      </div>
+    </AppProviders>
   );
 }

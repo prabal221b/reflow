@@ -1,10 +1,10 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { connectDB } from "../db/connection";
 import User from "../db/models/user";
 import { registerSchema } from "../validators/auth";
 import type { ActionResult } from "../types";
+import bcrypt from "bcryptjs";
 
 export async function registerUser(
   input: unknown
@@ -20,17 +20,15 @@ export async function registerUser(
     }
 
     const { name, email, password } = parsed.data;
-    console.log(`Register: Attempting registration for ${email}`);
     await connectDB();
-    console.log("Register: DB Connected.");
 
     const normalizedEmail = email.toLowerCase().trim();
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
-      console.log(`Register: Conflict - User ${normalizedEmail} already exists`);
+      // Generic message — do not reveal whether the email is registered
       return {
         success: false,
-        error: "An account with this email already exists",
+        error: "Unable to create account. Please try a different email or sign in.",
         code: "CONFLICT",
       };
     }
@@ -44,10 +42,8 @@ export async function registerUser(
       provider: "credentials",
     });
 
-    console.log(`Register: Successfully created user ${normalizedEmail}`);
     return { success: true, data: { id: user._id.toString() } };
-  } catch (error) {
-    console.error("Register Error Details:", error instanceof Error ? error.message : error);
+  } catch {
     return {
       success: false,
       error: "Something went wrong. Please try again.",

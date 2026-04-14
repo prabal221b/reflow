@@ -142,6 +142,7 @@ export default function LoginPage() {
         Don&apos;t have an account?{" "}
         <Link
           href="/register"
+          prefetch={false}
           className="font-medium text-[var(--primary)] hover:underline"
         >
           Create one

@@ -15,45 +15,34 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          console.log("Auth: Missing credentials");
           return null;
         }
-    
+
         try {
           await connectDB();
-    
+
           const email = (credentials.email as string).toLowerCase().trim();
-          console.log(`Auth Triggered: Attempting to authorize ${email}`);
           const user = await User.findOne({ email });
-    
-          if (!user) {
-            console.log(`Auth Failed: User not found - ${email}`);
+
+          if (!user || !user.passwordHash) {
             return null;
           }
-    
-          if (!user.passwordHash) {
-            console.log(`Auth Failed: User ${email} has no password hash (social login account)`);
-            return null;
-          }
-    
+
           const isValid = await bcrypt.compare(
             credentials.password as string,
             user.passwordHash
           );
-    
+
           if (!isValid) {
-            console.log(`Auth Failed: Invalid password for ${email}`);
             return null;
           }
-    
-          console.log(`Auth Success: User ${email} authorized. Returning session data.`);
+
           return {
             id: user._id.toString(),
             email: user.email,
             name: user.name,
           };
-        } catch (error) {
-          console.error("Auth Authorize System Error:", error instanceof Error ? error.message : "Internal Error");
+        } catch {
           return null;
         }
       },
@@ -69,35 +58,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ account, profile }) {
-      console.log(`Auth: SignIn callback triggered for provider: ${account?.provider}`);
       if (account?.provider === "google") {
-        if (!profile?.email) {
-          console.error("Auth: Google login failed - no email in profile");
-          return false;
-        }
+        if (!profile?.email) return false;
         return true;
       }
       return true;
     },
     async jwt({ token, user, account, profile }) {
-      // Logic for initial sign in
       if (user) {
         token.userId = user.id;
       }
 
-      // Special handling for Google to link/create user in our DB
+      // Sync Google user to our DB on first sign-in
       if (account?.provider === "google" && profile?.email) {
-        console.log(`Auth: Syncing Google user: ${profile.email}`);
         try {
-          console.log("Auth: Connecting to DB for sync...");
           await connectDB();
-          console.log("Auth: DB Connected.");
-          
           const email = profile.email.toLowerCase().trim();
           let dbUser = await User.findOne({ email });
 
           if (!dbUser) {
-            console.log("Auth: Creating new user...");
             dbUser = await User.create({
               email,
               name: profile.name || "User",
@@ -105,24 +84,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               providerId: account.providerAccountId,
               onboarding: {
                 completed: false,
-                responses: { platforms: [], triggers: [] }
-              }
+                responses: { platforms: [], triggers: [] },
+              },
             });
-            console.log(`Auth: Successfully created new user - ${email}`);
-          } else {
-            console.log(`Auth: Found existing user - ${email}`);
           }
 
           token.userId = dbUser._id.toString();
         } catch (error) {
-          console.error("Auth: Google user sync Error (Check DB Whitelist):", error instanceof Error ? error.message : "Internal Error");
+          console.error(
+            "Auth: Google sync failed:",
+            error instanceof Error ? error.message : "Unknown"
+          );
         }
       }
 
       return token;
     },
     async session({ session, token }) {
-      console.log("Auth: Session callback triggered.");
       if (token.userId) {
         session.user.id = token.userId as string;
       }
@@ -139,19 +117,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   logger: {
     error(error) {
-      // Suppress the noisy CredentialsSignin stack trace in development
-      if (error.name === "CredentialsSignin") {
-        console.log("Auth: Invalid credentials attempt (CredentialsSignin)");
-        return;
-      }
-      console.error(`Auth Global Error: ${error.message || error.name}`);
+      if (error.name === "CredentialsSignin") return;
+      console.error(`Auth Error: ${error.name}`);
     },
-    warn(code) {
-      console.warn(`Auth Warning: ${code}`);
-    },
-    debug(code, metadata) {
-      // console.log(`Auth Debug: ${code}`, metadata);
-    },
+    warn(_code) { /* suppress */ },
+    debug(_code, _metadata) { /* no-op */ },
   },
   secret: process.env.AUTH_SECRET,
   trustHost: true,
