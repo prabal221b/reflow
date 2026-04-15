@@ -5,7 +5,6 @@ import DailyLog from "@/lib/db/models/daily-log";
 import FocusSession from "@/lib/db/models/focus-session";
 import { getTodayString, daysSince } from "@/lib/utils/date";
 import { DashboardClient } from "./dashboard-client";
-import mongoose from "mongoose";
 
 export const metadata = { title: "Dashboard" };
 
@@ -13,16 +12,15 @@ export default async function DashboardPage() {
   const userId = await requireUserId();
   await connectDB();
 
-  const oid = new mongoose.Types.ObjectId(userId);
   const user = await getUser(userId);
   if (!user) return null;
 
   const dateStr = getTodayString(user.settings?.timezone);
 
   const [todayLog, activeSession] = await Promise.all([
-    DailyLog.findOne({ userId: oid, date: dateStr }).lean(),
+    DailyLog.findOne({ userId: user._id, date: dateStr }).lean(),
     FocusSession.findOne({
-      userId: oid,
+      userId: user._id,
       status: { $in: ["active", "paused"] },
       expiresAt: { $gt: new Date() },
     }).lean(),

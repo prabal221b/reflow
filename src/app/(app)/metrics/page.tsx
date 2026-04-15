@@ -1,16 +1,16 @@
 import { requireUserId } from "@/lib/auth/session";
 import { connectDB } from "@/lib/db/connection";
+import { getUser } from "@/lib/data/user";
 import DailyLog from "@/lib/db/models/daily-log";
 import { MetricsClient } from "./metrics-client";
-import mongoose from "mongoose";
 
 export const metadata = { title: "Progress" };
 
 export default async function MetricsPage() {
   const userId = await requireUserId();
   await connectDB();
-
-  const oid = new mongoose.Types.ObjectId(userId);
+  const user = await getUser(userId);
+  if (!user) return <MetricsClient logs={[]} />;
 
   // Get last 14 days of logs
   const twoWeeksAgo = new Date();
@@ -18,7 +18,7 @@ export default async function MetricsPage() {
   const dateStr = twoWeeksAgo.toISOString().split("T")[0];
 
   const logs = await DailyLog.find({
-    userId: oid,
+    userId: user._id,
     date: { $gte: dateStr },
   })
     .sort({ date: 1 })
